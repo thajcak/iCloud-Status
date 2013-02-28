@@ -11,4 +11,11 @@
 #ifdef __OBJC__
     #import <UIKit/UIKit.h>
     #import <Foundation/Foundation.h>
+
+    #import "InnerBand.h"
+    #import "MKNetworkKit.h"
+    #import "MKStoreManager.h"
+    #import "YRDropdownView.h"
 #endif
+
+#define USER_DEFAULTS [NSUserDefaults standardUserDefaults]

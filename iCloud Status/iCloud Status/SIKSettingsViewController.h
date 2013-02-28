@@ -1,0 +1,21 @@
+//
+//  SIKSettingsViewController.h
+//  iCloud Status
+//
+//  Created by Thomas Hajcak on 12/27/12.
+//  Copyright (c) 2012 Simple Ink. All rights reserved.
+//
+
+#import <UIKit/UIKit.h>
+#import <MessageUI/MessageUI.h>
+
+@interface SIKSettingsViewController : UIViewController <UITableViewDataSource, UITableViewDelegate, MFMailComposeViewControllerDelegate, UIActionSheetDelegate>
+
+@property (strong, nonatomic) IBOutlet UITableView *tableView;
+@property (strong, nonatomic) IBOutlet UILabel *versionNumber;
+@property (strong, nonatomic) IBOutlet UIButton *restoreAdRemovalButton;
+
+- (IBAction)closeSettings:(id)sender;
+- (IBAction)restoreAdRemoval:(id)sender;
+
+@end

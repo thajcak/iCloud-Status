@@ -1,0 +1,30 @@
+/* 
+  Localizable.strings
+  iCloud Status
+
+  Created by Thomas Hajcak on 12/30/12.
+  Copyright (c) 2012 Simple Ink. All rights reserved.
+*/
+
+"StatusLanguage" = "en_US";
+
+"System Status - No Issues" = "There are no reported issues at this time.";
+
+"Detailed Timeline - No Issues Today" = "There are no reported issues at this time.";
+"Detailed Timeline - No Issues Past" = "There were no reported issues.";
+"Detailed Timeline - Start" = "Start";
+"Detailed Timeline - End" = "End";
+
+"Button - System Status" = "View System Status";
+"Button - Detailed Timeline" = "View Detailed Timeline";
+
+"Settings - Ads Removed" = "Ads Removed";
+"Settings - Ads Removed Thanks" = "Thank you for your support";
+"Settings - Donations Not Loaded" = "Donations not yet loaded";
+"Settings - Select Donation Amount" = "Select Donation Amount";
+"Settings - Donation Received" = "Donation Received";
+"Settings - Donation Received Thanks" = "Thank you for your support";
+
+"Cancel" = "Cancel";
+"Updated" = "Updated";
+"Version" = "version";
