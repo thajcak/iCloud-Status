@@ -7,15 +7,12 @@
 //
 
 #import "SIKSettingsViewController.h"
-#import "HSLUpdateChecker.h"
-#import "Helpshift.h"
+
+//#import "UAPush.h"
 
 @interface SIKSettingsViewController ()
 {
     NSMutableArray *_settingsMenuArray;
-    
-    BOOL _isPurchasing;
-    BOOL _isRestoring;
 }
 
 @end
@@ -42,25 +39,19 @@
 {
     [super viewWillAppear:animated];
     
-    _isPurchasing = [USER_DEFAULTS boolForKey:@"isMakingPurchase"];
-    _isRestoring = [USER_DEFAULTS boolForKey:@"isRestoringPurchase"];
+    if (![USER_DEFAULTS valueForKey:@"PUSH OPTION SET"]) {
+        [USER_DEFAULTS setBool:YES forKey:@"PUSH OPTION SET"];
+        [USER_DEFAULTS synchronize];
+//        [[UAPush shared] setPushEnabled:NO];
+    }
     
     [self updateTableDataSource];
     [_tableView reloadData];
-    
-    if ([MKStoreManager isFeaturePurchased:@"remove_ads"]) {
-        [_restoreAdRemovalButton removeFromSuperview];
-    }
 }
 
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
-    
-    [[NSNotificationCenter defaultCenter] addObserver:_tableView
-                                             selector:@selector(reloadData)
-                                                 name:kProductFetchedNotification
-                                               object:nil];
 }
 
 - (void)viewWillDisappear:(BOOL)animated
@@ -79,22 +70,14 @@
 {
     _settingsMenuArray = [NSMutableArray array];
     
-    [_settingsMenuArray addObject:@"RateCell"];
-    
     [_settingsMenuArray addObject:@"SupportCell"];
     
     [_settingsMenuArray addObject:@"ReportBugsCell"];
     
+//    [_settingsMenuArray addObject:@"SupportPushCell"];
+    
     if ([USER_DEFAULTS boolForKey:@"appUpdateAvailable"]) {
         [_settingsMenuArray addObject:@"UpdateCell"];
-    }
-    
-    if (_isPurchasing) {
-        [_settingsMenuArray addObject:@"ProcessingCell"];
-    } else if ([MKStoreManager isFeaturePurchased:@"remove_ads"]) {
-        [_settingsMenuArray addObject:@"DonateCell"];
-    } else {
-        [_settingsMenuArray addObject:@"RemoveAdsCell"];
     }
 }
 
@@ -121,14 +104,30 @@
     NSString *cellIdentifier = [_settingsMenuArray objectAtIndex:indexPath.row];
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
 
-    if ([cellIdentifier isEqualToString:@"RemoveAdsCell"]) {
-        if ([[[MKStoreManager sharedManager] pricesDictionary] valueForKey:@"remove_ads"] != nil) {
-            UILabel *priceLabel = (UILabel *)[cell viewWithTag:2];
-            [priceLabel setText:[[[MKStoreManager sharedManager] pricesDictionary] valueForKey:@"remove_ads"]];
-        }
-    } else if ([cellIdentifier isEqualToString:@"ProcessingCell"]) {
+    if ([cellIdentifier isEqualToString:@"ProcessingCell"]) {
         UIActivityIndicatorView *activityIndicator = (UIActivityIndicatorView *)[cell viewWithTag:2];
         [activityIndicator startAnimating];
+    }
+    else if ([cellIdentifier isEqualToString:@"SupportPushCell"]) {
+        UISwitch *pushSwitch = (UISwitch *)[cell viewWithTag:1];
+//        if ([[UAPush shared] pushEnabled]) {
+//            [pushSwitch setOn:YES];
+//        } else {
+//            [pushSwitch setOn:NO];
+//        }
+    }
+    else if ([cellIdentifier isEqualToString:@"SupportCell"]) {
+        UIImageView *alert = (UIImageView *)[cell viewWithTag:2];
+        
+        if ([USER_DEFAULTS boolForKey:@"HAS SUPPORT PUSH"]) {
+            [alert setAlpha:1.0f];
+        } else {
+            [alert setAlpha:0.0f];
+        }
+    }
+    else if ([cellIdentifier isEqualToString:@"UpdateCell"]) {
+        UILabel *versionLabel = (UILabel *)[cell viewWithTag:2];
+        [versionLabel setText:[USER_DEFAULTS valueForKey:@"appStoreVersion"]];
     }
     
     return cell;
@@ -140,18 +139,14 @@
 {
     NSString *cellIdentifier = [[tableView cellForRowAtIndexPath:indexPath] reuseIdentifier];
     
-    if ([cellIdentifier isEqualToString:@"RemoveAdsCell"]) {
-        [self purchaseRemoveAds:indexPath];
-    } else if ([cellIdentifier isEqualToString:@"DonateCell"]) {
-        [self makeDonation:indexPath];
-    } else if ([cellIdentifier isEqualToString:@"UpdateCell"]) {
-        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:[USER_DEFAULTS valueForKey:@"updateUrl"]]];
-    } else if ([cellIdentifier isEqualToString:@"RateCell"]) {
-        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"itms-apps://ax.itunes.apple.com/WebObjects/MZStore.woa/wa/viewContentsUserReviews?type=Simple+Ink&id=590244968"]];
+    if ([cellIdentifier isEqualToString:@"UpdateCell"]) {
+        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:[USER_DEFAULTS valueForKey:@"appUpdateUrl"]]];
     } else if ([cellIdentifier isEqualToString:@"SupportCell"]) {
-        [[Helpshift sharedInstance] showSupport:self];
+        [USER_DEFAULTS setBool:NO forKey:@"HAS SUPPORT PUSH"];
+        [USER_DEFAULTS synchronize];
+//        [[Helpshift sharedInstance] showSupport:self];
     } else if ([cellIdentifier isEqualToString:@"ReportBugsCell"]) {
-        [[Helpshift sharedInstance] reportIssue:self];
+//        [[Helpshift sharedInstance] reportIssue:self];
     }
 }
 
@@ -168,60 +163,6 @@
     }
 }
 
-#pragma mark - Action Sheet Delegate
-
-- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex
-{
-    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:actionSheet.tag inSection:0];
-    
-    if ((buttonIndex+1) != [actionSheet numberOfButtons]) {
-        if (!_isPurchasing) {
-            _isPurchasing = YES;
-            [USER_DEFAULTS setBool:_isPurchasing forKey:@"isMakingPurchase"];
-            [USER_DEFAULTS synchronize];
-            
-            [self updateTableDataSource];
-            [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationLeft];
-            
-            NSString *featureId;
-            switch (buttonIndex) {
-                case 0:
-                    featureId = @"donation_tier_1";
-                    break;
-                case 1:
-                    featureId = @"donation_tier_2";
-                    break;
-            }
-            
-            [[MKStoreManager sharedManager] buyFeature:featureId
-                                            onComplete:^(NSString *purchasedFeature, NSData *purchasedReceipt, NSArray *availableDownloads) {
-                                                _isPurchasing = NO;
-                                                [USER_DEFAULTS setBool:_isPurchasing forKey:@"isMakingPurchase"];
-                                                [USER_DEFAULTS synchronize];
-                                                [self updateTableDataSource];
-                                                [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationRight];
-                                                [YRDropdownView showDropdownInView:self.view
-                                                                             title:NSLocalizedString(@"Settings - Donation Received", @"Donation Received")
-                                                                            detail:NSLocalizedString(@"Settings - Donation Received Thanks", @"Thank you for your support")
-                                                                             image:nil
-                                                                   backgroundImage:[UIImage imageNamed:@"bg-gray.png"]
-                                                                          animated:YES
-                                                                         hideAfter:4.0f];
-                                            }
-                                           onCancelled:^{
-                                               _isPurchasing = NO;
-                                               [USER_DEFAULTS setBool:_isPurchasing forKey:@"isMakingPurchase"];
-                                               [USER_DEFAULTS synchronize];
-                                               [self updateTableDataSource];
-                                               [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationRight];
-                                           }];
-        }
-    } else {
-        [self updateTableDataSource];
-        [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationRight];
-    }
-}
-
 #pragma mark - Actions
 
 - (IBAction)closeSettings:(id)sender
@@ -229,139 +170,16 @@
     [self dismissViewControllerAnimated:YES completion:^{}];
 }
 
-- (IBAction)restoreAdRemoval:(id)sender
+- (IBAction)togglePushNotifications:(id)sender
 {
-    if (!_isPurchasing && !_isRestoring) {
-        _isRestoring = YES;
-        [USER_DEFAULTS setBool:_isRestoring forKey:@"isRestoringPurchase"];
-        [USER_DEFAULTS synchronize];
-        
-        [_restoreAdRemovalButton setEnabled:NO];
-        
-        [[MKStoreManager sharedManager] restorePreviousTransactionsOnComplete:^
-         {
-             _isRestoring = NO;
-             [USER_DEFAULTS setBool:_isRestoring forKey:@"isRestoringPurchase"];
-             [USER_DEFAULTS synchronize];
-             
-             [_restoreAdRemovalButton removeFromSuperview];
-             
-             [self updateTableDataSource];
-             [_tableView reloadData];
-             [YRDropdownView showDropdownInView:self.view
-                                          title:NSLocalizedString(@"Settings - Ads Removed", @"Ads Removed")
-                                         detail:NSLocalizedString(@"Settings - Ads Removed Thanks", @"Thank you for your support")
-                                          image:nil
-                                backgroundImage:[UIImage imageNamed:@"bg-gray.png"]
-                                       animated:YES
-                                      hideAfter:4.0f];
-         }
-                                                                      onError:^(NSError *error)
-         {
-             _isRestoring = NO;
-             [USER_DEFAULTS setBool:_isRestoring forKey:@"isRestoringPurchase"];
-             [USER_DEFAULTS synchronize];
-             
-             [_restoreAdRemovalButton setEnabled:YES];
-             
-             [YRDropdownView showDropdownInView:self.view
-                                          title:[error localizedFailureReason]
-                                         detail:[error localizedDescription]
-                                          image:nil
-                                backgroundImage:[UIImage imageNamed:@"bg-yellow.png"]
-                                       animated:YES
-                                      hideAfter:4.0f];
-         }];
-    }
-}
-
-- (void)showFeedback:(NSIndexPath *)indexPath
-{
+    UISwitch *notificationsSwitch = (UISwitch *)sender;
     
-    if ([MFMailComposeViewController canSendMail]) {
-        [_settingsMenuArray replaceObjectAtIndex:indexPath.row withObject:@"EmptyCell"];
-        [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationLeft];
-        
-        MFMailComposeViewController *mailCompose = [[MFMailComposeViewController alloc] init];
-        [mailCompose setMailComposeDelegate:self];
-        [mailCompose.navigationBar setBarStyle:UIBarStyleBlack];
-        [mailCompose setToRecipients:[NSArray arrayWithObject:@"thomas.hajcak@gmail.com"]];
-        [mailCompose setSubject:@"iCloud Status Feedback"];
-        [self presentViewController:mailCompose
-                           animated:YES
-                         completion:nil];
-    }
-}
-
-- (void)purchaseRemoveAds:(NSIndexPath *)indexPath
-{
-    if (!_isPurchasing && !_isRestoring && [[[MKStoreManager sharedManager] pricesDictionary] valueForKey:@"remove_ads"] != nil) {
-        _isPurchasing = YES;
-        [USER_DEFAULTS setBool:_isPurchasing forKey:@"isMakingPurchase"];
-        [USER_DEFAULTS synchronize];
-        
-        [self updateTableDataSource];
-        [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationLeft];
-        [[MKStoreManager sharedManager] buyFeature:@"remove_ads"
-                                        onComplete:^(NSString *purchasedFeature, NSData *purchasedReceipt, NSArray *availableDownloads) {
-                                            _isPurchasing = NO;
-                                            [USER_DEFAULTS setBool:_isPurchasing forKey:@"isMakingPurchase"];
-                                            [USER_DEFAULTS synchronize];
-                                            [self updateTableDataSource];
-                                            [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationRight];
-                                            [YRDropdownView showDropdownInView:self.view
-                                                                         title:NSLocalizedString(@"Settings - Ads Removed", @"Ads Removed")
-                                                                        detail:NSLocalizedString(@"Settings - Ads Removed Thanks", @"Thanks for your support")
-                                                                         image:nil
-                                                               backgroundImage:[UIImage imageNamed:@"bg-gray.png"]
-                                                                      animated:YES
-                                                                     hideAfter:4.0f];
-                                        }
-                                       onCancelled:^{
-                                           _isPurchasing = NO;
-                                           [USER_DEFAULTS setBool:_isPurchasing forKey:@"isMakingPurchase"];
-                                           [USER_DEFAULTS synchronize];
-                                           [self updateTableDataSource];
-                                           [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationRight];
-                                       }];
+    if (notificationsSwitch.isOn) {
+//        [[UAPush shared] registerForRemoteNotificationTypes:(UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+//        [[UAPush shared] setPushEnabled:YES];
     } else {
-        UITableViewCell *cell = [_tableView cellForRowAtIndexPath:indexPath];
-        [UIView animateWithDuration:0.3
-                              delay:0.0
-                            options:UIViewAnimationOptionCurveEaseIn
-                         animations:^{
-                             [cell setLeft:-100.0f];
-                         }
-                         completion:^(BOOL isFinished){
-                             [UIView animateWithDuration:0.3
-                                                   delay:0.0
-                                                 options:UIViewAnimationOptionCurveEaseOut
-                                              animations:^{
-                                                  [cell setLeft:0.0f];
-                                              }
-                                              completion:^(BOOL isFinished){
-                                                  
-                                              }];
-                         }];
+//        [[UAPush shared] setPushEnabled:NO];
     }
-}
-
-- (void)makeDonation:(NSIndexPath *)indexPath
-{
-    [_settingsMenuArray replaceObjectAtIndex:indexPath.row withObject:@"EmptyCell"];
-    [_tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationLeft];
-    
-    UIActionSheet *donationSheet = [[UIActionSheet alloc] initWithTitle:([[[MKStoreManager sharedManager] pricesDictionary] valueForKey:@"donation_tier_1"] == nil ? NSLocalizedString(@"Settings - Donations Not Loaded", @"Donations not yet loaded") : NSLocalizedString(@"Settings - Select Donation Amount", @"Select Donation Amount"))
-                                                               delegate:self
-                                                      cancelButtonTitle:NSLocalizedString(@"Cancel", @"Cancel")
-                                                 destructiveButtonTitle:nil
-                                                      otherButtonTitles:
-                                    [[[MKStoreManager sharedManager] pricesDictionary] valueForKey:@"donation_tier_1"],
-                                    [[[MKStoreManager sharedManager] pricesDictionary] valueForKey:@"donation_tier_2"],
-                                    [[[MKStoreManager sharedManager] pricesDictionary] valueForKey:@"donation_tier_5"],
-                                    [[[MKStoreManager sharedManager] pricesDictionary] valueForKey:@"donation_tier_10"],nil];
-    [donationSheet setTag:indexPath.row];
-    [donationSheet showInView:self.view];
 }
 
 @end

@@ -7,9 +7,8 @@
 //
 
 #import <UIKit/UIKit.h>
-#import "GADBannerViewDelegate.h"
 
-@interface SIKViewController : UIViewController <UICollectionViewDataSource, UICollectionViewDelegate, UITableViewDataSource, UITableViewDelegate, GADBannerViewDelegate>
+@interface SIKViewController : UIViewController <UICollectionViewDataSource, UICollectionViewDelegate, UITableViewDataSource, UITableViewDelegate>
 
 @property (strong, nonatomic) IBOutlet UIView *mainView;
 @property (strong, nonatomic) IBOutlet UIView *containerView;
@@ -21,13 +20,13 @@
 @property (strong, nonatomic) IBOutlet UILabel *lastUpdateLabel;
 
 @property (strong, nonatomic) IBOutlet UIButton *refreshButton;
+@property (strong, nonatomic) IBOutlet UILabel *supportAlertLabel;
 
 
 - (void)updateStatus;
-- (void)hideBannerAd;
-- (void)startBannerAd;
 
 - (IBAction)toggleFlipside:(id)sender;
 - (IBAction)refreshStatus:(id)sender;
+- (void)updateSupportFeedbackBadgeAnimated:(BOOL)animated;
 
 @end

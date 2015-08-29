@@ -8,7 +8,6 @@
 
 #import "SIKViewController.h"
 #import "SIKAppleEngine.h"
-#import "GADBannerView.h"
 #import "UIImage+BBlock.h"
 
 @interface SIKViewController ()
@@ -17,10 +16,6 @@
     NSDictionary *_currentStatus;
     
     UIRefreshControl *_refreshControl;
-    
-    GADBannerView *_bannerView;
-    
-    float _bannerHeight;
     
     NSMutableArray *_openedViews;
     
@@ -47,69 +42,21 @@
     
     [_flipsideView removeFromSuperview];
     
-    _bannerHeight = 0.0f;
-    
-    if (![MKStoreManager isFeaturePurchased:@"remove_ads"]) {
-        _bannerView = [[GADBannerView alloc] initWithAdSize:kGADAdSizeSmartBannerPortrait];
-        [_bannerView setAdUnitID:@"0cd0fffe0cde4ad7"];
-        [_bannerView setRootViewController:self];
-        [_bannerView setDelegate:self];
-        [_bannerView setTop:_mainView.height];
-        [_bannerView setAutoresizingMask:(UIViewAutoresizingFlexibleTopMargin)];
-        [self.view addSubview:_bannerView];
-        [_bannerView loadRequest:[GADRequest request]];
-    }
-    
     _openedViews = [NSMutableArray array];
+    
+    [_supportAlertLabel.layer setCornerRadius:9.0f];
+    [_supportAlertLabel.layer setBorderColor:[UIColor whiteColor].CGColor];
+    [_supportAlertLabel.layer setBorderWidth:3.0f];
+    [_supportAlertLabel.layer setMasksToBounds:YES];
 }
 
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
     
-    if (UIInterfaceOrientationIsPortrait(self.interfaceOrientation)) {
-        [_bannerView setAdSize:kGADAdSizeSmartBannerPortrait];
-    } else if (UIInterfaceOrientationIsLandscape(self.interfaceOrientation)) {
-        [_bannerView setAdSize:kGADAdSizeSmartBannerLandscape];
-    }
-    
-    if ([MKStoreManager isFeaturePurchased:@"remove_ads"]) {
-        [self hideBannerAd];
-        [_bannerView removeFromSuperview];
-    }
+    [self updateSupportFeedbackBadgeAnimated:NO];
 }
 
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
-}
-
-- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
-{
-    if (UIInterfaceOrientationIsPortrait(toInterfaceOrientation)) {
-        [_bannerView setAdSize:kGADAdSizeSmartBannerPortrait];
-    } else if (UIInterfaceOrientationIsLandscape(toInterfaceOrientation)) {
-        [_bannerView setAdSize:kGADAdSizeSmartBannerLandscape];
-    }
-}
-
-- (void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation
-{
-    float newMainViewHeight = _mainView.height + _bannerHeight - _bannerView.mediatedAdView.height;
-    _bannerHeight = _bannerView.mediatedAdView.height;
-    
-    [UIView animateWithDuration:0.4
-                          delay:0.0
-                        options:UIViewAnimationOptionAllowUserInteraction
-                     animations:^{
-                         [_mainView setHeight:newMainViewHeight];
-                         [_bannerView setTop:newMainViewHeight];
-                     }
-                     completion:^(BOOL isFinished){
-                         
-                     }];
-}
 
 #pragma mark - Private Methods
 
@@ -236,18 +183,17 @@
     NSArray *dictionaryKeys = [[sectionDictionary allKeys] sortedArray];
     NSDictionary *thisSectionItem = [sectionDictionary valueForKey:[dictionaryKeys objectAtIndex:indexPath.row]];
     
-    UIImage *statusImage = nil;
-    if ([thisSectionItem count] > 0) {
-        UIColor *yellowColor = [UIColor colorWithRed: 0.806 green: 0.726 blue: 0 alpha: 1];
-        statusImage = [self imageForServiceWithColor:yellowColor andIdentifier:@"serviceStatusWarning"];
-        [alert setText:[NSString stringWithFormat:@"%@: %@", [[thisSectionItem valueForKey:@"statusType"] objectAtIndex:0], [[thisSectionItem valueForKey:@"usersAffected"] objectAtIndex:0]]];
-        [alert setBackgroundColor:yellowColor];
-    } else {
-        UIColor *greenColor = [UIColor colorWithRed: 0.063 green: 0.751 blue: 0.442 alpha: 1];
-        statusImage = [self imageForServiceWithColor:greenColor andIdentifier:@"serviceStatusOkay"];
-        [alert setBackgroundColor:greenColor];
-    }
+    NSString *statusType = ([[thisSectionItem valueForKey:@"statusType"] count] == 0 ? @"" : [[thisSectionItem valueForKey:@"statusType"] objectAtIndex:0]);
+    UIImage *statusImage = [self imageForServiceWithIdentifier:statusType];
     [statusImageView setImage:statusImage];
+    
+    [alert setBackgroundColor:[self colorForServiceWithIdentifier:statusType]];
+    
+    if ([thisSectionItem count] > 0) {
+        [alert setText:[NSString stringWithFormat:@"%@: %@",
+                        [[thisSectionItem valueForKey:@"statusType"] objectAtIndex:0],
+                        ([[thisSectionItem valueForKey:@"usersAffected"] objectAtIndex:0] == [NSNull null] ? @"Number of Users Affected Unknown" : [[thisSectionItem valueForKey:@"usersAffected"] objectAtIndex:0])]];
+    }
     
     if ([_openedViews containsObject:indexPath]) {
         [label setText:@"➧"];
@@ -447,64 +393,62 @@
         }
     }
     
-    NSString *thisItemMessage = [NSString stringWithFormat:@"%@%@%@\n\n%@%@%@",
+    NSString *thisItemMessage = [NSString stringWithFormat:@"%@%@%@\n%@%@%@",
                                  ([[historyItem valueForKey:@"messageTitle"] isEqual:[NSNull null]] ? @"" : [NSString stringWithFormat:@"%@\n", [historyItem valueForKey:@"messageTitle"]]),
                                  ([[historyItem valueForKey:@"statusType"] isEqual:[NSNull null]] ? @"" : [NSString stringWithFormat:@"%@: ", [historyItem valueForKey:@"statusType"]]),
                                  [historyItem valueForKey:@"message"],
-                                 [historyItem valueForKey:@"usersAffected"],
+                                 ([historyItem valueForKey:@"usersAffected"] == [NSNull null] ? @"" : [NSString stringWithFormat:@"\n%@", [historyItem valueForKey:@"usersAffected"]]),
                                  (startDateString == nil ? @"" : [NSString stringWithFormat:@"\n%@: %@", NSLocalizedString(@"Detailed Timeline - Start", @"Start"), startDateString]),
                                  (endDateString == nil ? @"" : [NSString stringWithFormat:@"\n%@: %@", NSLocalizedString(@"Detailed Timeline - End", @"End") , endDateString])];
     return thisItemMessage;
 }
 
-#pragma mark - Table View Delegate
-
 #pragma mark - Google AdMob Banner Delegate
 
-- (void)adViewDidReceiveAd:(GADBannerView *)view
-{
-    
-    if ([MKStoreManager isFeaturePurchased:@"remove_ads"]) {
-        [self hideBannerAd];
-        [_bannerView removeFromSuperview];
-    } else {
-        float newMainViewHeight = _mainView.height + _bannerHeight - view.height;
-        _bannerHeight = view.height;
-
-        [UIView animateWithDuration:0.4
-                              delay:0.0
-                            options:UIViewAnimationOptionAllowUserInteraction
-                         animations:^{
-                             [_mainView setHeight:newMainViewHeight];
-                             [view setTop:newMainViewHeight];
-                         }
-                         completion:^(BOOL isFinished){
-                             
-                         }];
-    }
-}
-
-- (void)adView:(GADBannerView *)view didFailToReceiveAdWithError:(GADRequestError *)error
-{
-    float newMainViewHeight = _mainView.height + _bannerHeight - view.height;
-    _bannerHeight = view.height;
-    
-    [UIView animateWithDuration:0.4
-                          delay:0.0
-                        options:UIViewAnimationOptionAllowUserInteraction
-                     animations:^{
-                         [_mainView setHeight:newMainViewHeight];
-                         [view setTop:newMainViewHeight];
-                     }
-                     completion:^(BOOL isFinished){
-                         
-                     }];
-}
-
-- (void)adViewWillLeaveApplication:(GADBannerView *)adView
-{
-    [self hideBannerAd];
-}
+//- (void)adViewDidReceiveAd:(GADBannerView *)view
+//{
+//    
+//    if ([MKStoreManager isFeaturePurchased:@"remove_ads"]) {
+//        [self hideBannerAd];
+//        [_bannerView removeFromSuperview];
+//    } else {
+//        float newMainViewHeight = _mainView.height + _bannerHeight - view.height;
+//        _bannerHeight = view.height;
+//
+//        [UIView animateWithDuration:0.4
+//                              delay:0.0
+//                            options:UIViewAnimationOptionAllowUserInteraction
+//                         animations:^{
+//                             [_mainView setHeight:newMainViewHeight];
+//                             [view setTop:newMainViewHeight];
+//                         }
+//                         completion:^(BOOL isFinished){
+//                             
+//                         }];
+//    }
+//}
+//
+//- (void)adView:(GADBannerView *)view didFailToReceiveAdWithError:(GADRequestError *)error
+//{
+//    float newMainViewHeight = _mainView.height + _bannerHeight - view.height;
+//    _bannerHeight = view.height;
+//    
+//    [UIView animateWithDuration:0.4
+//                          delay:0.0
+//                        options:UIViewAnimationOptionAllowUserInteraction
+//                     animations:^{
+//                         [_mainView setHeight:newMainViewHeight];
+//                         [view setTop:newMainViewHeight];
+//                     }
+//                     completion:^(BOOL isFinished){
+//                         
+//                     }];
+//}
+//
+//- (void)adViewWillLeaveApplication:(GADBannerView *)adView
+//{
+//    [self hideBannerAd];
+//}
 
 #pragma mark - Actions
 
@@ -537,9 +481,11 @@
                     completion:^(BOOL isFinished){
                         if (isShowingMainView) {
                             [_collectionView removeFromSuperview];
+                            [_tableView addSubview:_refreshControl];
                         } else {
                             [_tableView setContentOffset:CGPointMake(0.0f, 0.0f)];
                             [_flipsideView removeFromSuperview];
+                            [_collectionView addSubview:_refreshControl];
                             [self updateStatus];
                         }
                         [_toggleFlipsideButton setEnabled:YES];
@@ -550,40 +496,70 @@
     [self updateStatus];
 }
 
-- (void)hideBannerAd
-{
-    float newMainViewHeight = _mainView.height + _bannerHeight;
-    _bannerHeight = 0.0f;
-    
-    [UIView animateWithDuration:0.4
-                          delay:0.0
-                        options:UIViewAnimationOptionAllowUserInteraction
-                     animations:^{
-                         [_mainView setHeight:newMainViewHeight];
-                         [_bannerView setTop:newMainViewHeight];
-                     }
-                     completion:^(BOOL isFinished){
-                         
-                     }];
-}
-
-- (void)startBannerAd
-{
-    [_bannerView loadRequest:[GADRequest request]];
-}
+//- (void)hideBannerAd
+//{
+//    float newMainViewHeight = _mainView.height + _bannerHeight;
+//    _bannerHeight = 0.0f;
+//    
+//    [UIView animateWithDuration:0.4
+//                          delay:0.0
+//                        options:UIViewAnimationOptionAllowUserInteraction
+//                     animations:^{
+//                         [_mainView setHeight:newMainViewHeight];
+//                         [_bannerView setTop:newMainViewHeight];
+//                     }
+//                     completion:^(BOOL isFinished){
+//                         
+//                     }];
+//}
+//
+//- (void)startBannerAd
+//{
+//    [_bannerView loadRequest:[GADRequest request]];
+//}
 
 #pragma mark - Image Creation
 
-- (UIImage *)imageForServiceWithColor:(UIColor *)color andIdentifier:(NSString *)identifier
+- (UIColor *)colorForServiceWithIdentifier:(NSString *)identifier
 {
-    return [UIImage imageWithIdentifier:identifier
+    UIColor *statusColor;
+    
+    if ([identifier isEqualToString:@"Maintenance"]) {
+        statusColor = [UIColor colorWithRed: 0 green: 0.609 blue: 0.808 alpha: 1];
+    }
+    else if ([identifier isEqualToString:@"Issue"]) {
+        statusColor = [UIColor colorWithRed: 0.806 green: 0.726 blue: 0 alpha: 1];
+    }
+    else {
+        statusColor = [UIColor colorWithRed: 0.063 green: 0.751 blue: 0.442 alpha: 1];
+    }
+    
+    return statusColor;
+}
+
+- (UIImage *)imageForServiceWithIdentifier:(NSString *)identifier
+{
+    UIColor *statusColor = [self colorForServiceWithIdentifier:identifier];
+    NSString *drawingIdendifier;
+    
+    if ([identifier isEqualToString:@"Maintenance"]) {
+        drawingIdendifier = @"serviceStatusMaintenance";
+    }
+    else if ([identifier isEqualToString:@"Issue"]) {
+        drawingIdendifier = @"serviceStatusWarning";
+    }
+    else {
+        drawingIdendifier = @"serviceStatusOkay";
+    }
+    
+    return [UIImage imageWithIdentifier:drawingIdendifier
                                 forSize:CGSizeMake(15.0f, 40.0f)
                         andDrawingBlock:^{
                             //// General Declarations
                             CGContextRef context = UIGraphicsGetCurrentContext();
                             
                             //// Color Declarations
-                            UIColor* statusColor = color;
+//                            UIColor* statusColor = statusColor;
                             
                             //// Shadow Declarations
                             UIColor* shadow = [UIColor blackColor];
@@ -675,6 +651,28 @@
                             ovalPath.lineWidth = 1;
                             [ovalPath stroke];
                         }];
+}
+
+- (void)updateSupportFeedbackBadgeAnimated:(BOOL)animated
+{
+    NSInteger duration;
+    if (animated) {
+        duration = 0.4;
+    } else {
+        duration = 0.0;
+    }
+    
+    if ([USER_DEFAULTS boolForKey:@"HAS SUPPORT PUSH"]) {
+        [UIView animateWithDuration:duration
+                         animations:^{
+                             [_supportAlertLabel setAlpha:1.0f];
+                         }];
+    } else {
+        [UIView animateWithDuration:duration
+                         animations:^{
+                             [_supportAlertLabel setAlpha:0.0f];
+                         }];
+    }
 }
 
 @end

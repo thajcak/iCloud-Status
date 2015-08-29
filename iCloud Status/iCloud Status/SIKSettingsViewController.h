@@ -9,13 +9,12 @@
 #import <UIKit/UIKit.h>
 #import <MessageUI/MessageUI.h>
 
-@interface SIKSettingsViewController : UIViewController <UITableViewDataSource, UITableViewDelegate, MFMailComposeViewControllerDelegate, UIActionSheetDelegate>
+@interface SIKSettingsViewController : UIViewController <UITableViewDataSource, UITableViewDelegate>
 
 @property (strong, nonatomic) IBOutlet UITableView *tableView;
 @property (strong, nonatomic) IBOutlet UILabel *versionNumber;
-@property (strong, nonatomic) IBOutlet UIButton *restoreAdRemovalButton;
 
 - (IBAction)closeSettings:(id)sender;
-- (IBAction)restoreAdRemoval:(id)sender;
 
+- (IBAction)togglePushNotifications:(id)sender;
 @end
