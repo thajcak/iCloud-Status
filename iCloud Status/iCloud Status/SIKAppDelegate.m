@@ -25,6 +25,8 @@
         [USER_DEFAULTS setBool:NO forKey:@"HAS SUPPORT PUSH"];
         [USER_DEFAULTS synchronize];
     }
+    
+    [[UIApplication sharedApplication] setStatusBarStyle:UIStatusBarStyleLightContent];
 
     return YES;
 }
